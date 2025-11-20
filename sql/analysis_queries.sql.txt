@@ -1,0 +1,70 @@
+-- Total revenue, total orders, and average order values
+WITH order_totals AS 
+    (SELECT oi.order_id, SUM(oi.line_amount) AS order_total
+FROM cafe.order_items oi
+GROUP BY oi.order_id)
+SELECT ROUND(SUM(order_total), 2) AS total_revenue,
+       COUNT(*) AS total_orders,
+       ROUND(AVG(order_total), 2) AS avg_order_value
+FROM order_totals;
+
+------------------------------------------------------------
+
+-- Monthly revenue 
+SELECT date_trunc('month', o.order_date)::date AS month,
+       ROUND(SUM(oi.line_amount), 2) AS revenue
+FROM cafe.orders o
+JOIN cafe.order_items oi 
+	ON oi.order_id = o.order_id
+GROUP BY 1
+ORDER BY 1;
+
+------------------------------------------------------------
+
+-- Top products by revenue
+WITH product_rev AS 
+    (SELECT p.product_name, SUM(oi.line_amount) AS revenue
+FROM cafe.order_items oi
+JOIN cafe.products p 
+	ON p.product_id = oi.product_id
+GROUP BY 1)
+SELECT product_name,ROUND(revenue, 2) AS revenue,
+       RANK() OVER (ORDER BY revenue DESC) AS rank
+FROM product_rev
+ORDER BY revenue DESC;
+
+------------------------------------------------------------
+
+-- Repeat customer rate
+WITH oc AS (SELECT customer_id, COUNT(*) AS orders_cnt
+FROM cafe.orders
+GROUP BY 1)
+SELECT ROUND(SUM(CASE WHEN orders_cnt >= 2 
+THEN 1 ELSE 0 END)::numeric / COUNT(*), 2) AS repeat_customer_rate
+FROM oc;
+
+------------------------------------------------------------
+
+-- Customer revenue leaderboard
+WITH cust_rev AS (SELECT c.customer_name, SUM(oi.line_amount) AS revenue
+FROM cafe.customers c
+JOIN cafe.orders o 
+	ON o.customer_id = c.customer_id
+JOIN cafe.order_items oi 
+	ON oi.order_id = o.order_id
+GROUP BY c.customer_name)
+
+SELECT customer_name,ROUND(revenue, 2) AS revenue,
+       RANK() OVER (ORDER BY revenue DESC) AS rank
+FROM cust_rev
+ORDER BY revenue DESC;
+
+------------------------------------------------------------
+
+-- Revenue by category
+SELECT p.category,ROUND(SUM(oi.line_amount), 2) AS revenue
+FROM cafe.order_items oi
+JOIN cafe.products p 
+	ON p.product_id = oi.product_id
+GROUP BY 1
+ORDER BY revenue DESC;
